@@ -2,11 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Parque Terrorífico</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Courier New',monospace}
-#c{display:block;width:100%;height:100%}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Courier New',monospace;touch-action:none}
+#c{display:block;width:100%;height:100%;touch-action:none}
 
 #splash{position:fixed;inset:0;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:300;gap:16px;color:#fff;text-align:center}
 #splash h1{font-size:52px;color:#ff3300;letter-spacing:5px;line-height:1.1;text-shadow:0 0 40px rgba(255,51,0,.7)}
@@ -42,6 +43,11 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Co
 #btn-retry:hover{background:rgba(255,100,0,.1)}
 
 #flash{position:fixed;inset:0;background:rgba(220,0,0,.38);opacity:0;pointer-events:none;z-index:200;transition:opacity .12s}
+
+#tjoy{display:none;position:fixed;left:22px;bottom:22px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.22);z-index:150;touch-action:none}
+#tjoy-knob{position:absolute;left:50%;top:50%;width:48px;height:48px;margin:-24px 0 0 -24px;border-radius:50%;background:rgba(255,90,0,.5);border:1px solid rgba(255,150,60,.75)}
+#tbuttons{display:none;position:fixed;right:16px;bottom:22px;flex-direction:column;gap:12px;z-index:150}
+.tbtn{width:62px;height:62px;border-radius:50%;background:rgba(255,50,0,.32);border:1px solid rgba(255,110,50,.6);color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;user-select:none;touch-action:none}
 </style>
 </head>
 <body>
@@ -76,6 +82,13 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Co
 <div id="msg"></div>
 <div id="bum">ESPACIO → Distrae con Patito &nbsp;|&nbsp; F → ¡BUM!</div>
 <div id="flash"></div>
+
+<div id="tjoy"><div id="tjoy-knob"></div></div>
+<div id="tbuttons">
+  <div class="tbtn" id="tbtn-patito">🦆</div>
+  <div class="tbtn" id="tbtn-bum">💥</div>
+  <div class="tbtn" id="tbtn-arena">⚗️</div>
+</div>
 
 <script>
 
@@ -610,6 +623,15 @@ mkItem('cuchillo', 3,  0.4, -110-6);     // Sótano: coordenada mundo
 const keys = {};
 let yaw=0, pitch=0;
 const SPEED = 6;
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+const touchMove = {x:0, y:0}; // joystick virtual: -1..1
+
+function tryPointerLock(){
+  try{
+    const req = document.body.requestPointerLock || document.body.mozRequestPointerLock;
+    if(req) req.call(document.body);
+  }catch(e){}
+}
 
 document.addEventListener('keydown', e=>{ keys[e.code]=true; onKey(e); });
 document.addEventListener('keyup',   e=>{ keys[e.code]=false; });
@@ -617,10 +639,10 @@ document.addEventListener('keyup',   e=>{ keys[e.code]=false; });
 document.addEventListener('pointerlockchange', ()=>{});
 
 function setupPointerLock(){
+  if(isTouch){ setupTouchControls(); return; }
   canvas.addEventListener('click', ()=>{
     if(!SYS.activo) return;
-    document.body.requestPointerLock = document.body.requestPointerLock || document.body.mozRequestPointerLock;
-    document.body.requestPointerLock();
+    tryPointerLock();
     initAudio();
     if(SYS.activo) onClickAction();
   });
@@ -631,6 +653,77 @@ function setupPointerLock(){
     pitch -= e.movementY * sens;
     pitch  = Math.max(-Math.PI/2+0.05, Math.min(Math.PI/2-0.05, pitch));
   });
+}
+
+// ─ Controles táctiles (tablet/móvil) ──────────
+function setupTouchControls(){
+  document.getElementById('tjoy').style.display='block';
+  document.getElementById('tbuttons').style.display='flex';
+
+  // Joystick de movimiento
+  const base = document.getElementById('tjoy');
+  const knob = document.getElementById('tjoy-knob');
+  let joyId=null, cx=0, cy=0;
+  const maxR=40;
+  base.addEventListener('touchstart', e=>{
+    const t=e.changedTouches[0];
+    joyId=t.identifier;
+    const r=base.getBoundingClientRect();
+    cx=r.left+r.width/2; cy=r.top+r.height/2;
+    initAudio();
+    e.preventDefault();
+  }, {passive:false});
+  base.addEventListener('touchmove', e=>{
+    for(const t of e.changedTouches){
+      if(t.identifier!==joyId) continue;
+      let dx=t.clientX-cx, dy=t.clientY-cy;
+      const d=Math.hypot(dx,dy);
+      if(d>maxR){ dx=dx/d*maxR; dy=dy/d*maxR; }
+      knob.style.transform=`translate(${dx}px,${dy}px)`;
+      touchMove.x=dx/maxR; touchMove.y=dy/maxR;
+    }
+    e.preventDefault();
+  }, {passive:false});
+  const joyEnd = e=>{
+    for(const t of e.changedTouches){
+      if(t.identifier!==joyId) continue;
+      joyId=null; touchMove.x=0; touchMove.y=0;
+      knob.style.transform='translate(0,0)';
+    }
+  };
+  base.addEventListener('touchend', joyEnd);
+  base.addEventListener('touchcancel', joyEnd);
+
+  // Arrastre en el canvas para mirar alrededor
+  let lookId=null, lastX=0, lastY=0;
+  const sens=0.0045;
+  canvas.addEventListener('touchstart', e=>{
+    if(!SYS.activo || lookId!==null) return;
+    const t=e.changedTouches[0];
+    lookId=t.identifier; lastX=t.clientX; lastY=t.clientY;
+  });
+  canvas.addEventListener('touchmove', e=>{
+    for(const t of e.changedTouches){
+      if(t.identifier!==lookId) continue;
+      yaw   -= (t.clientX-lastX)*sens;
+      pitch -= (t.clientY-lastY)*sens;
+      pitch  = Math.max(-Math.PI/2+0.05, Math.min(Math.PI/2-0.05, pitch));
+      lastX=t.clientX; lastY=t.clientY;
+    }
+  });
+  const lookEnd = e=>{
+    for(const t of e.changedTouches){ if(t.identifier===lookId) lookId=null; }
+  };
+  canvas.addEventListener('touchend', lookEnd);
+  canvas.addEventListener('touchcancel', lookEnd);
+
+  // Botones de acción
+  const btn = (id, fn) => document.getElementById(id).addEventListener('touchstart', e=>{
+    e.preventDefault(); initAudio(); fn();
+  }, {passive:false});
+  btn('tbtn-patito', accionPatito);
+  btn('tbtn-bum', accionBUM);
+  btn('tbtn-arena', accionArena);
 }
 
 const euler = new THREE.Euler(0,0,0,'YXZ');
@@ -650,6 +743,10 @@ function updateCamera(dt){
   if(keys['KeyS']||keys['ArrowDown'])  moveDir.sub(forward);
   if(keys['KeyA']||keys['ArrowLeft'])  moveDir.sub(right);
   if(keys['KeyD']||keys['ArrowRight']) moveDir.add(right);
+  if(touchMove.x || touchMove.y){
+    moveDir.addScaledVector(forward, -touchMove.y);
+    moveDir.addScaledVector(right, touchMove.x);
+  }
 
   if(moveDir.lengthSq()>0) moveDir.normalize();
   camera.position.addScaledVector(moveDir, SPEED*dt);
@@ -698,12 +795,17 @@ function iniciarJuego(){
 
   mostrarMsg('Cruza la plaza. Fcox te observa...\nEncuentra la 🗝️ Llave para abrir la Casa Mala.', 4500);
 
-  // Bloquear ratón
-  document.body.requestPointerLock = document.body.requestPointerLock||document.body.mozRequestPointerLock;
-  document.body.requestPointerLock();
+  // Bloquear ratón (no aplica en touch, ahí se usa arrastre táctil)
+  if(!isTouch) tryPointerLock();
 }
 
 // ── Splash ────────────────────────────────────
+if(isTouch){
+  document.querySelector('#splash .keys').innerHTML =
+    '<div><b>JOYSTICK</b> — Mover</div><div><b>ARRASTRAR</b> — Cámara</div>'+
+    '<div><b>🦆</b> — Patito</div><div><b>💥</b> — BUM (sótano)</div>'+
+    '<div><b>⚗️</b> — Lanzar arena</div><div></div>';
+}
 document.getElementById('btn-play').addEventListener('click', ()=>{
   initAudio();
   document.getElementById('splash').style.display='none';
