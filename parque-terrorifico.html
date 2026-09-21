@@ -229,6 +229,11 @@ function buildParque(){
     sphere(1.8+Math.random()*.5, 0x0a1600, x, h+1.5, z, g);
   });
 
+  // Arbusto (escondite de Found), junto a la llave
+  sphere(0.32, 0x0d1a05, 2.7, 0.28, -18.8, g);
+  sphere(0.26, 0x0e1c06, 2.95,0.42, -18.5, g);
+  sphere(0.28, 0x0c1805, 2.55,0.35, -19.15, g);
+
   // Farolas plaza
   [[-4,-15],[4,-15]].forEach(([x,z])=>{
     cyl(0.08,5,0x222222, x,2.5,z, g);
@@ -447,6 +452,90 @@ scene.add(boniaxGroup);
 
   // Luz fantasmal
   plight(0xaaaaff, 0, 14, 0, 0.3, 0, g);
+})();
+
+// ── FOUND ─────────────────────────────────────
+const foundGroup = new THREE.Group();
+foundGroup.visible = false;
+scene.add(foundGroup);
+(function buildFound(){
+  const g = foundGroup;
+  const piel    = new THREE.MeshLambertMaterial({color:0xb8b23a});
+  const oreja   = new THREE.MeshLambertMaterial({color:0xdb4f9c});
+  const orejaI  = new THREE.MeshLambertMaterial({color:0xb83070});
+  const gris    = new THREE.MeshLambertMaterial({color:0x55555f});
+  const crema   = new THREE.MeshLambertMaterial({color:0xe8ddc0});
+  const naranja = new THREE.MeshLambertMaterial({color:0xd97a2a});
+  const negro   = new THREE.MeshLambertMaterial({color:0x1a1a1a});
+
+  // Pies-hongo
+  [-0.13,0.13].forEach(x=>{
+    const tallo = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,0.16,8), crema);
+    tallo.position.set(x,0.08,0.02); g.add(tallo);
+    const capa = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,6), crema);
+    capa.scale.set(1,0.55,1);
+    capa.position.set(x,0.17,0); g.add(capa);
+  });
+
+  // Pantalón crema
+  const pantalon = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.13,0.34,8), crema);
+  pantalon.position.set(0,0.38,0); g.add(pantalon);
+
+  // Torso gris con mangas amarillas
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.32,0.22), gris);
+  torso.position.set(0,0.68,0); g.add(torso);
+  [-0.2,0.2].forEach(x=>{
+    const manga = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.24,8), piel);
+    manga.position.set(x,0.66,0);
+    manga.rotation.z = x<0 ? 0.32 : -0.32;
+    g.add(manga);
+  });
+
+  // Bufanda naranja
+  const bufanda = new THREE.Mesh(new THREE.TorusGeometry(0.13,0.05,8,12), naranja);
+  bufanda.rotation.x = Math.PI/2;
+  bufanda.position.set(0,0.86,0); g.add(bufanda);
+
+  // Cabeza
+  const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.24,12,10), piel);
+  cabeza.position.set(0,1.06,0); g.add(cabeza);
+
+  // Marca X en la cara
+  [0.4,-0.4].forEach(rot=>{
+    const linea = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.03,0.02), negro);
+    linea.position.set(0,1.06,0.22); linea.rotation.z=rot;
+    g.add(linea);
+  });
+
+  // Ojos (puntos oscuros bajo la X)
+  [-0.08,0.08].forEach(x=>{
+    const ojo = new THREE.Mesh(new THREE.SphereGeometry(0.025,6,6), negro);
+    ojo.position.set(x,1.07,0.235); g.add(ojo);
+  });
+
+  // Orejas pétalo rosa
+  [-0.13,0.13].forEach(x=>{
+    const orejaExt = new THREE.Mesh(new THREE.ConeGeometry(0.1,0.42,6), oreja);
+    orejaExt.position.set(x,1.42,-0.02);
+    orejaExt.rotation.z = x<0 ? 0.18 : -0.18;
+    g.add(orejaExt);
+    const orejaInt = new THREE.Mesh(new THREE.ConeGeometry(0.06,0.36,6), orejaI);
+    orejaInt.position.set(x,1.4,0.03);
+    orejaInt.rotation.z = x<0 ? 0.18 : -0.18;
+    g.add(orejaInt);
+  });
+
+  // Tamagotchi colgando de un hilo
+  const hilo = new THREE.Mesh(new THREE.CylinderGeometry(0.005,0.005,0.18,4), negro);
+  hilo.position.set(0.2,0.5,0.08); g.add(hilo);
+  const tama = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,6), negro);
+  tama.scale.set(1,1.2,0.6);
+  tama.position.set(0.2,0.4,0.08); g.add(tama);
+  const pantalla = new THREE.Mesh(new THREE.CircleGeometry(0.02,8),
+    new THREE.MeshBasicMaterial({color:0x33ff55}));
+  pantalla.position.set(0.2,0.4,0.115); g.add(pantalla);
+
+  const pl = new THREE.PointLight(0xffee99, 0, 6); g.add(pl);
 })();
 
 // ── LINTERNA (hija de cámara) ─────────────────
@@ -806,6 +895,9 @@ function recogerItem(item){
     case 'llave':
       INV.llave=true;
       mostrarMsg('🗝️ ¡Llave obtenida! Ve a la puerta de la Casa Mala.',3200);
+      setTimeout(()=>mostrarFound(1.9,0,-18.3,
+        'Found: "Ey... con esa llave no vas a poder entrar. Vas a tener que pasar por SUS infiernos."',5200),
+      2400);
       break;
     case 'arena':
       INV.arena++;
@@ -857,6 +949,9 @@ function entrarCasa(){
   SFX.nivel();
   document.getElementById('ntag').textContent='NIVEL 2: LA CASA MALA';
   mostrarMsg('Las Ventanas de Recuerdo... algo se mueve entre ellas.\nLlega hasta la trampilla al fondo.',4500);
+  setTimeout(()=>mostrarFound(-3,0,-48,
+    'Found: "No estás solo. Yo también estoy obligado a jugar. Fcox diseñó todo esto... un juego que hay que sobrevivir, siempre."',5500),
+  4700);
 }
 
 function entrarSotano(){
@@ -870,6 +965,9 @@ function entrarSotano(){
   SFX.nivel();
   document.getElementById('ntag').textContent='NIVEL 3: EL SÓTANO';
   mostrarMsg('🦊 Fcox te persigue. Encuentra el 🔪 Cuchillo.\nUsa ESPACIO para distraerlo, luego F.',5000);
+  setTimeout(()=>mostrarFound(2,0,-92,
+    'Found: "Aquí abajo Fcox te mira desde cada rincón. Cuidado."',4800),
+  5200);
 }
 
 function trigVictoria(){
@@ -972,6 +1070,17 @@ function mostrarMsg(txt,dur=2500){
 function doFlash(slow=false){
   const el=document.getElementById('flash');
   el.style.opacity=1; setTimeout(()=>el.style.opacity=0,slow?700:160);
+}
+
+// ─ Found (personaje narrativo) ────────────────
+let tFound=null;
+function mostrarFound(x,y,z,mensaje,dur=5000){
+  foundGroup.position.set(x,y,z);
+  foundGroup.visible=true;
+  const distraido = Math.random()<0.3;
+  mostrarMsg(distraido ? '🎮 Found está clavado en su tamagotchi... ni te presta atención.' : mensaje, dur);
+  clearTimeout(tFound);
+  tFound=setTimeout(()=>{ foundGroup.visible=false; }, dur+600);
 }
 
 // ─ Utils ─────────────────────────────────────
