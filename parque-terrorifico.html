@@ -357,50 +357,131 @@ function addText3D(str, x, y, z, color, group=scene, id=null){
   return mesh;
 }
 
+// ── Helpers de costura/parche (estética "muñeco de tela") ──
+function stitchX(x,y,z,s,color,group){
+  const m = new THREE.MeshLambertMaterial({color});
+  const a = new THREE.Mesh(new THREE.BoxGeometry(s,s*0.16,s*0.16), m);
+  a.position.set(x,y,z); a.rotation.z = 0.55; group.add(a);
+  const b = new THREE.Mesh(new THREE.BoxGeometry(s,s*0.16,s*0.16), m);
+  b.position.set(x,y,z); b.rotation.z = -0.55; group.add(b);
+}
+function raggedHem(radius,y,count,spikeLen,color,group){
+  const m = new THREE.MeshLambertMaterial({color});
+  for(let i=0;i<count;i++){
+    const a = (i/count)*Math.PI*2;
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(radius*0.32,spikeLen,5), m);
+    spike.position.set(Math.cos(a)*radius, y-spikeLen*0.4, Math.sin(a)*radius);
+    spike.rotation.x = Math.PI;
+    group.add(spike);
+  }
+}
+function spikyBall(r,color,x,y,z,group){
+  const gg = new THREE.Group();
+  const m = new THREE.MeshLambertMaterial({color});
+  gg.add(new THREE.Mesh(new THREE.SphereGeometry(r,8,6), m));
+  for(let i=0;i<9;i++){
+    const th = (i/9)*Math.PI*2, ph = Math.acos(1-2*((i*0.37)%1));
+    const dir = new THREE.Vector3(Math.sin(ph)*Math.cos(th), Math.cos(ph), Math.sin(ph)*Math.sin(th));
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(r*0.28,r*1.3,5), m);
+    spike.position.copy(dir).multiplyScalar(r*0.85);
+    spike.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+    gg.add(spike);
+  }
+  gg.position.set(x,y,z);
+  group.add(gg);
+  return gg;
+}
+
 // ═══════════════════════════════════════════════
 //  CONSTRUIR PERSONAJES
 // ═══════════════════════════════════════════════
 
-// ── FCOX ─────────────────────────────────────
+// ── FCOX (niño-fantasma de papel, versión mini de Found) ──
 const fcoxGroup = new THREE.Group();
 scene.add(fcoxGroup);
 (function buildFcox(){
   const g = fcoxGroup;
-  // Cuerpo
-  box(0.65,0.8,0.38, 0xFF4400, 0,0.85,0, g);
-  sphere(0.18,0xcc0000, 0,0.85,0.12, g, {transparent:true,opacity:0.75});
-  // Cabeza
-  sphere(0.42, 0xFF6600, 0,1.5,0, g);
-  box(0.22,0.16,0.2, 0xFF8800, 0,1.4,0.38, g); // hocico
-  // Orejas
-  cone(0.1,0,0.38, 0xFF5500, -0.18,1.95,0, g);
-  cone(0.1,0,0.38, 0xFF5500,  0.18,1.95,0, g);
-  // Ojos emisivos
-  sphere(0.065,0xff0000, -0.14,1.55,0.38, g, {emissive:0xff0000,emissiveIntensity:0.9});
-  sphere(0.065,0xff0000,  0.14,1.55,0.38, g, {emissive:0xff0000,emissiveIntensity:0.9});
-  // Piernas
-  cyl(0.09,0.55, 0xcc4400, -0.18,0.25,0, g);
-  cyl(0.09,0.55, 0xcc4400,  0.18,0.25,0, g);
-  // Cola
-  const cola = cyl(0.1,0.7, 0xFF8800, 0,0.7,-0.45, g);
-  cola.rotation.x = 80*Math.PI/180;
-  sphere(0.16,0xFF9900, 0,0.35,-0.75, g);
-  // Luz de ojos
-  plight(0xff2200, 0.4, 4, 0,1.55,0.5, g);
+  const crema = 0xd9cfae, cremaSombra = 0xb8a97e, rojo = 0x9c1a26, negro = 0x171310;
+
+  // Túnica de papel irregular
+  cone(0.3,0.16,0.62, crema, 0,0.4,0, g);
+  raggedHem(0.3,0.09,9,0.18,cremaSombra,g);
+  stitchX(0.13,0.35,0.2, 0.1, rojo, g);
+  stitchX(-0.09,0.5,0.21, 0.07, negro, g);
+
+  // Brazos
+  const brazoI = cyl(0.032,0.34, crema, -0.26,0.52,0.03, g); brazoI.rotation.z = 0.55;
+  const brazoD = cyl(0.032,0.32, crema, 0.26,0.54,0, g); brazoD.rotation.z = -0.75;
+
+  // Mano con bola espinosa roja
+  spikyBall(0.07, rojo, -0.42,0.3,0.05, g);
+  // Garras de la mano libre
+  [-0.05,0,0.05].forEach(dx=>{
+    const garra = cone(0.012,0,0.09, crema, 0.36+dx*0.4,0.68,0.03, g);
+    garra.rotation.x = -0.9;
+  });
+
+  // Capucha puntiaguda
+  cone(0.18,0.02,0.3, crema, 0,0.86,0, g);
+  cone(0.05,0,0.16, crema, -0.12,1.0,-0.02, g).rotation.z = 0.25;
+  cone(0.05,0,0.16, crema,  0.12,1.0,-0.02, g).rotation.z = -0.25;
+
+  // Ojos rojos brillantes con hilo de costura
+  [-0.055,0.055].forEach(x=>{
+    const ojo = new THREE.Mesh(new THREE.CircleGeometry(0.03,10),
+      new THREE.MeshBasicMaterial({color:0xdd1122}));
+    ojo.position.set(x,0.84,0.165); g.add(ojo);
+    cyl(0.006,0.06, negro, x,0.78,0.16, g);
+  });
+
+  plight(0x8a0f16, 0.35, 4, 0,0.85,0.2, g);
 })();
 fcoxGroup.position.set(0,0,15);
 
-// ── PAHON PAHON ───────────────────────────────
+// ── PAHON PAHON (boca de papel con dientes, emerge del piso) ──
 const pahonGroup = new THREE.Group();
 scene.add(pahonGroup);
 (function buildPahon(){
   const g = pahonGroup;
-  sphere(0.55,0x00cc44, 0,0.3,0, g, {transparent:true,opacity:0.85});
-  box(0.45,0.3,0.5, 0x00aa33, 0,0.65,0.3, g);
-  sphere(0.07,0xaaff00, -0.12,0.75,0.5, g, {emissive:0xaaff00,emissiveIntensity:0.9});
-  sphere(0.07,0xaaff00,  0.12,0.75,0.5, g, {emissive:0xaaff00,emissiveIntensity:0.9});
-  sphere(0.85,0x39ff14, 0,0.3,0, g, {transparent:true,opacity:0.1,side:THREE.BackSide});
-  plight(0x00ff44, 0, 8, 0,0.5,0, g); // se activa al emerger
+  const naranja = new THREE.MeshLambertMaterial({color:0xcf7a2e});
+  const interior = new THREE.MeshLambertMaterial({color:0x200a00});
+  const diente = new THREE.MeshLambertMaterial({color:0xeee3c8});
+
+  // Cuerpo-boca con cuña abierta (estilo Pac-Man)
+  const mouthGroup = new THREE.Group();
+  const bodyGeo = new THREE.SphereGeometry(0.4, 16, 12, -0.55, Math.PI*2-1.1);
+  mouthGroup.add(new THREE.Mesh(bodyGeo, naranja));
+  mouthGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.36,14,10), interior));
+  for(let i=0;i<9;i++){
+    const th = Math.PI*0.22 + (i/8)*Math.PI*0.56;
+    const zig = (i%2===0) ? 0.025 : -0.025;
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.035,0.1,5), diente);
+    tooth.position.set(Math.sin(th)*0.39, Math.cos(th)*0.39, zig);
+    tooth.rotation.z = Math.PI - th;
+    mouthGroup.add(tooth);
+  }
+  mouthGroup.rotation.y = -Math.PI/2;
+  mouthGroup.rotation.x = 0.3;
+  mouthGroup.position.set(0,0.42,0);
+  g.add(mouthGroup);
+
+  // Ojitos cosidos arriba
+  [-0.08,0.08].forEach(x=>{
+    sphere(0.035,0x150800, x,0.68,0.24, g);
+  });
+
+  // Apéndice espinoso rojo enroscado
+  for(let i=0;i<5;i++){
+    const rad = 0.18 - i*0.028;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(Math.max(rad,0.03),0.03,6,12),
+      new THREE.MeshLambertMaterial({color:0xa8202a}));
+    ring.rotation.x = Math.PI/2 + i*0.35;
+    ring.position.set(0.42, 0.05+i*0.09, 0.05-i*0.01);
+    g.add(ring);
+  }
+
+  sphere(0.85,0xff8a3a, 0,0.3,0, g, {transparent:true,opacity:0.08,side:THREE.BackSide});
+  plight(0xff6a2a, 0, 8, 0,0.5,0, g); // se activa al emerger
 })();
 pahonGroup.position.set(12,-2.5,-10);
 
@@ -410,61 +491,71 @@ boniaxGroup.visible = false;
 scene.add(boniaxGroup);
 (function buildBoniax(){
   const g = boniaxGroup;
-  const mat = new THREE.MeshLambertMaterial({color:0xffffff, transparent:true, opacity:0.5});
-  const matI = new THREE.MeshLambertMaterial({color:0xffbbcc, transparent:true, opacity:0.4}); // interior orejas
+  const teal = 0x2f8f86, purpura = 0x4a2569, purpuraOsc = 0x30184a;
+  const crema = 0xdcd0a8, amarillo = 0xcf9a1e, negro = 0x1a1410;
 
-  // Cuerpo ovalado
-  const cuerpo = new THREE.Mesh(new THREE.SphereGeometry(0.32,10,8), mat);
-  cuerpo.scale.set(1, 1.35, 0.85);
-  cuerpo.position.set(0, 0, 0);
-  g.add(cuerpo);
+  // Falda inferior violeta con dobladillo irregular
+  cone(0.34,0.21,0.55, purpura, 0,0.34,0, g);
+  raggedHem(0.34,0.07,9,0.2,purpuraOsc,g);
+
+  // Torso turquesa
+  cone(0.22,0.16,0.42, teal, 0,0.8,0, g);
+
+  // Ojo cosido en el pecho
+  const anillo = new THREE.Mesh(new THREE.TorusGeometry(0.1,0.02,8,16),
+    new THREE.MeshLambertMaterial({color:negro}));
+  anillo.position.set(0,0.78,0.17); g.add(anillo);
+  const iris = new THREE.Mesh(new THREE.CircleGeometry(0.085,16),
+    new THREE.MeshBasicMaterial({color:amarillo}));
+  iris.position.set(0,0.78,0.18); g.add(iris);
+  const pupila = new THREE.Mesh(new THREE.CircleGeometry(0.035,12),
+    new THREE.MeshBasicMaterial({color:negro}));
+  pupila.position.set(0,0.78,0.185); g.add(pupila);
+  [0,Math.PI/2,Math.PI,Math.PI*1.5].forEach(a=>{
+    stitchX(Math.cos(a)*0.11,0.78+Math.sin(a)*0.11,0.16,0.035,negro,g);
+  });
+
+  // Brazos con garras
+  [-1,1].forEach(s=>{
+    const brazo = cyl(0.04,0.42, teal, s*0.26,0.95,0, g);
+    brazo.rotation.z = s*0.5;
+    [-0.04,0,0.04].forEach(dx=>{
+      const garra = cone(0.012,0,0.09, crema, s*0.42+dx, 0.62, 0.05, g);
+      garra.rotation.x = -0.9;
+    });
+  });
+
+  // Pelo/hilos colgantes (lados y espalda, sin tapar la cara)
+  for(let i=0;i<12;i++){
+    const a = (i/12)*Math.PI*2;
+    if(Math.sin(a) > 0.15) continue; // deja la cara despejada
+    const len = 0.3 + (i%3)*0.08;
+    const hebra = cone(0.018,0.004,len, i%2===0?purpura:purpuraOsc,
+      Math.cos(a)*0.12, 1.28-len/2, Math.sin(a)*0.12, g);
+    hebra.rotation.x = Math.cos(a)*0.3;
+    hebra.rotation.z = Math.sin(a)*0.3;
+  }
 
   // Cabeza
-  const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.26,10,8), mat);
-  cabeza.position.set(0, 0.62, 0);
-  g.add(cabeza);
+  sphere(0.155, crema, 0,1.35,0, g);
 
-  // Oreja IZQUIERDA (dos cilindros: exterior + interior rosa)
-  const orejaGeoExt = new THREE.CylinderGeometry(0.07, 0.09, 0.55, 8);
-  const orejaGeoInt = new THREE.CylinderGeometry(0.035, 0.05, 0.52, 8);
+  // Orejas largas con vendaje a rayas
+  [-1,1].forEach(s=>{
+    const oreja = cyl(0.055,0.4, teal, s*0.09,1.68,0, g);
+    oreja.rotation.z = s*0.12;
+    oreja.rotation.x = -0.1;
+    [0.55,0.8,1.05].forEach(f=>{
+      const banda = cyl(0.06,0.035, purpuraOsc, s*0.09,1.48+f*0.4,0, g);
+      banda.rotation.z = s*0.12;
+      banda.rotation.x = -0.1;
+    });
+  });
 
-  const orejaIzqExt = new THREE.Mesh(orejaGeoExt, mat);
-  orejaIzqExt.position.set(-0.14, 1.14, 0);
-  orejaIzqExt.rotation.z = 0.15;
-  g.add(orejaIzqExt);
-
-  const orejaIzqInt = new THREE.Mesh(orejaGeoInt, matI);
-  orejaIzqInt.position.set(-0.14, 1.14, 0.03);
-  orejaIzqInt.rotation.z = 0.15;
-  g.add(orejaIzqInt);
-
-  // Oreja DERECHA
-  const orejaDeExt = new THREE.Mesh(orejaGeoExt, mat);
-  orejaDeExt.position.set(0.14, 1.14, 0);
-  orejaDeExt.rotation.z = -0.15;
-  g.add(orejaDeExt);
-
-  const orejaDeInt = new THREE.Mesh(orejaGeoInt, matI);
-  orejaDeInt.position.set(0.14, 1.14, 0.03);
-  orejaDeInt.rotation.z = -0.15;
-  g.add(orejaDeInt);
-
-  // Cola esférica atrás
-  const cola = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 6), mat);
-  cola.position.set(0, 0.05, -0.33);
-  g.add(cola);
-
-  // Ojos "> <" como canvas texture sobre la cabeza
-  addText3D('> <', 0, 0.62, 0.28, 0x220022, g);
-
-  // Naricita
-  const nariz = new THREE.Mesh(new THREE.SphereGeometry(0.03,6,4),
-    new THREE.MeshLambertMaterial({color:0xff8888,transparent:true,opacity:0.7}));
-  nariz.position.set(0, 0.57, 0.27);
-  g.add(nariz);
+  // Ojos cosidos "I I"
+  addText3D('I  I', 0, 1.35, 0.145, negro, g);
 
   // Luz fantasmal
-  plight(0xaaaaff, 0, 14, 0, 0.3, 0, g);
+  plight(0x6a4a96, 0, 14, 0, 0.85, 0, g);
 })();
 
 // ── FOUND ─────────────────────────────────────
@@ -473,82 +564,55 @@ foundGroup.visible = false;
 scene.add(foundGroup);
 (function buildFound(){
   const g = foundGroup;
-  const piel    = new THREE.MeshLambertMaterial({color:0xb8b23a});
-  const oreja   = new THREE.MeshLambertMaterial({color:0xdb4f9c});
-  const orejaI  = new THREE.MeshLambertMaterial({color:0xb83070});
-  const gris    = new THREE.MeshLambertMaterial({color:0x55555f});
-  const crema   = new THREE.MeshLambertMaterial({color:0xe8ddc0});
-  const naranja = new THREE.MeshLambertMaterial({color:0xd97a2a});
-  const negro   = new THREE.MeshLambertMaterial({color:0x1a1a1a});
+  const crema = 0xe4d9b8, rojo = 0xa8182a, negro = 0x1a1410;
 
-  // Pies-hongo
-  [-0.13,0.13].forEach(x=>{
-    const tallo = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.06,0.16,8), crema);
-    tallo.position.set(x,0.08,0.02); g.add(tallo);
-    const capa = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,6), crema);
-    capa.scale.set(1,0.55,1);
-    capa.position.set(x,0.17,0); g.add(capa);
+  // Túnica inferior con dobladillo rojo irregular
+  cone(0.3,0.24,0.6, crema, 0,0.34,0, g);
+  raggedHem(0.3,0.05,10,0.22,rojo,g);
+
+  // Torso
+  cone(0.24,0.17,0.55, crema, 0,0.915,0, g);
+
+  // Parches rojos cosidos
+  const p1 = box(0.16,0.22,0.02, rojo, 0.1,0.95,0.16, g); p1.rotation.z = 0.3;
+  stitchX(0.1,0.95,0.17,0.06,negro,g);
+  const p2 = box(0.14,0.18,0.02, rojo, -0.08,0.72,0.17, g); p2.rotation.z = -0.2;
+
+  // Bufanda roja
+  const bufanda = new THREE.Mesh(new THREE.TorusGeometry(0.16,0.045,8,12),
+    new THREE.MeshLambertMaterial({color:rojo}));
+  bufanda.rotation.x = Math.PI/2; bufanda.position.set(0,1.13,0); g.add(bufanda);
+  const cola = box(0.07,0.28,0.015, rojo, 0.09,0.92,0.16, g); cola.rotation.z = 0.15;
+
+  // Reloj de bolsillo colgando de una cadena
+  cyl(0.006,0.22, negro, 0.18,0.86,0.1, g).rotation.z = -0.3;
+  const reloj = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,6), new THREE.MeshLambertMaterial({color:negro}));
+  reloj.scale.set(1,1,0.5); reloj.position.set(0.18,0.73,0.11); g.add(reloj);
+
+  // Brazos: uno con garras alzado, otro con bola espinosa
+  const brazoGarra = cyl(0.045,0.4, crema, -0.24,1.08,0, g); brazoGarra.rotation.z = 0.9;
+  [-0.05,0,0.05].forEach(dx=>{
+    const garra = cone(0.014,0,0.1, crema, -0.46+dx,1.3,0.05, g);
+    garra.rotation.x = -0.7;
   });
+  const brazoBola = cyl(0.045,0.42, crema, 0.26,1.0,0, g); brazoBola.rotation.z = -0.65;
+  spikyBall(0.09, rojo, 0.44,0.72,0.1, g);
 
-  // Pantalón crema
-  const pantalon = new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.13,0.34,8), crema);
-  pantalon.position.set(0,0.38,0); g.add(pantalon);
+  // Cabeza / capucha puntiaguda de dos picos
+  cone(0.21,0.02,0.4, crema, 0,1.39,0, g);
+  cone(0.06,0,0.18, crema, -0.13,1.56,-0.02, g).rotation.z = 0.22;
+  cone(0.06,0,0.18, crema,  0.13,1.56,-0.02, g).rotation.z = -0.22;
 
-  // Torso gris con mangas amarillas
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34,0.32,0.22), gris);
-  torso.position.set(0,0.68,0); g.add(torso);
-  [-0.2,0.2].forEach(x=>{
-    const manga = new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,0.24,8), piel);
-    manga.position.set(x,0.66,0);
-    manga.rotation.z = x<0 ? 0.32 : -0.32;
-    g.add(manga);
+  // Ojos rojos brillantes con hilos que gotean
+  [-0.075,0.075].forEach(x=>{
+    const ojo = new THREE.Mesh(new THREE.CircleGeometry(0.045,12),
+      new THREE.MeshBasicMaterial({color:0xee1122}));
+    ojo.position.set(x,1.4,0.2); g.add(ojo);
+    cyl(0.006,0.09, negro, x,1.32,0.19, g);
   });
+  stitchX(0,1.26,0.2,0.08,negro,g);
 
-  // Bufanda naranja
-  const bufanda = new THREE.Mesh(new THREE.TorusGeometry(0.13,0.05,8,12), naranja);
-  bufanda.rotation.x = Math.PI/2;
-  bufanda.position.set(0,0.86,0); g.add(bufanda);
-
-  // Cabeza
-  const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.24,12,10), piel);
-  cabeza.position.set(0,1.06,0); g.add(cabeza);
-
-  // Marca X en la cara
-  [0.4,-0.4].forEach(rot=>{
-    const linea = new THREE.Mesh(new THREE.BoxGeometry(0.32,0.03,0.02), negro);
-    linea.position.set(0,1.06,0.22); linea.rotation.z=rot;
-    g.add(linea);
-  });
-
-  // Ojos (puntos oscuros bajo la X)
-  [-0.08,0.08].forEach(x=>{
-    const ojo = new THREE.Mesh(new THREE.SphereGeometry(0.025,6,6), negro);
-    ojo.position.set(x,1.07,0.235); g.add(ojo);
-  });
-
-  // Orejas pétalo rosa
-  [-0.13,0.13].forEach(x=>{
-    const orejaExt = new THREE.Mesh(new THREE.ConeGeometry(0.1,0.42,6), oreja);
-    orejaExt.position.set(x,1.42,-0.02);
-    orejaExt.rotation.z = x<0 ? 0.18 : -0.18;
-    g.add(orejaExt);
-    const orejaInt = new THREE.Mesh(new THREE.ConeGeometry(0.06,0.36,6), orejaI);
-    orejaInt.position.set(x,1.4,0.03);
-    orejaInt.rotation.z = x<0 ? 0.18 : -0.18;
-    g.add(orejaInt);
-  });
-
-  // Tamagotchi colgando de un hilo
-  const hilo = new THREE.Mesh(new THREE.CylinderGeometry(0.005,0.005,0.18,4), negro);
-  hilo.position.set(0.2,0.5,0.08); g.add(hilo);
-  const tama = new THREE.Mesh(new THREE.SphereGeometry(0.045,8,6), negro);
-  tama.scale.set(1,1.2,0.6);
-  tama.position.set(0.2,0.4,0.08); g.add(tama);
-  const pantalla = new THREE.Mesh(new THREE.CircleGeometry(0.02,8),
-    new THREE.MeshBasicMaterial({color:0x33ff55}));
-  pantalla.position.set(0.2,0.4,0.115); g.add(pantalla);
-
-  const pl = new THREE.PointLight(0xffee99, 0, 6); g.add(pl);
+  const pl = new THREE.PointLight(0x8a1018, 0.5, 7); pl.position.set(0,1.3,0.15); g.add(pl);
 })();
 
 // ── LINTERNA (hija de cámara) ─────────────────
